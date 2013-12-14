@@ -35,6 +35,9 @@ echo 'deb http://get.docker.io/ubuntu docker main' > \
 apt-get update -q
 apt-get install -y linux-image-extra-`uname -r` git curl
 
+
+
+locale-gen sv_SE.UTF-8
 if [ ! /etc/default/locale ]; then
 cat > /etc/default/locale << EOF
 LANG="en_US.UTF-8"
@@ -138,6 +141,7 @@ Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
 
   config.vm.provider :virtualbox do |vb, override|
     override.vm.provision :shell, :inline => $vbox_script
+    vb.memory = 1024
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
   end
