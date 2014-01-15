@@ -8,9 +8,10 @@ AWS_BOX_URI = ENV['BOX_URI'] || "https://github.com/mitchellh/vagrant-aws/raw/ma
 AWS_REGION = ENV['AWS_REGION'] || "us-east-1"
 AWS_AMI = ENV['AWS_AMI'] || "ami-69f5a900"
 AWS_INSTANCE_TYPE = ENV['AWS_INSTANCE_TYPE'] || 't1.micro'
-FORWARD_DOCKER_PORTS = ENV['FORWARD_DOCKER_PORTS']
-SSH_PRIVKEY_PATH = ENV['SSH_PRIVKEY_PATH']
 PRIVATE_NETWORK = ENV['PRIVATE_NETWORK']
+FORWARD_DOCKER_PORTS = ENV['FORWARD_DOCKER_PORTS']
+
+SSH_PRIVKEY_PATH = ENV["SSH_PRIVKEY_PATH"]
 
 # A script to upgrade from the 12.04 kernel to the raring backport kernel (3.8)
 # and install docker.
@@ -23,9 +24,9 @@ if [ -z "$user" ]; then
 fi
 
 # Adding an apt gpg key is idempotent.
-wget -q -O - https://get.docker.io/gpg | apt-key add -
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9
 
-# Creating the docker.list file is idempotent, but it may overrite desired
+# Creating the docker.list file is idempotent, but it may overwrite desired
 # settings if it already exists.  This could be solved with md5sum but it
 # doesn't seem worth it.
 echo 'deb http://get.docker.io/ubuntu docker main' > \
@@ -33,26 +34,25 @@ echo 'deb http://get.docker.io/ubuntu docker main' > \
 
 # Update remote package metadata.  'apt-get update' is idempotent.
 apt-get update -q
-apt-get install -y linux-image-extra-`uname -r` git curl
 
-
-
-locale-gen sv_SE.UTF-8
-if [ ! /etc/default/locale ]; then
-cat > /etc/default/locale << EOF
-LANG="en_US.UTF-8"
-LC_ALL="sv_SE.UTF-8"
-LANGUAGE="en_UTF.UTF-8"
-EOF
-fi
 # Install docker.  'apt-get install' is idempotent.
 apt-get install -q -y lxc-docker
 
 usermod -a -G docker "$user"
 
 
+locale-gen sv_SE.UTF-8
+if [[ ! /etc/default/locale ]]; then
+cat > /etc/default/locale << EOF
+LANG="en_US.UTF-8"
+LC_ALL="sv_SE.UTF-8"
+LANGUAGE="en_UTF.UTF-8"
+EOF
+fi
 
+#apt-get install -y linux-image-extra-`uname -r`
 curl -fL https://raw.github.com/mesosphere/mesos-docker/master/bin/mesos-docker-setup | sudo bash
+
 
 SCRIPT
 
@@ -62,18 +62,19 @@ SCRIPT
 # trigger dkms to build the virtualbox guest module install.
 $vbox_script = <<VBOX_SCRIPT + $script
 # Install the VirtualBox guest additions if they aren't already installed.
-if [ ! -d /opt/VBoxGuestAdditions-4.3.2/ ]; then
+if [ ! -d /opt/VBoxGuestAdditions-4.3.6/ ]; then
     # Update remote package metadata.  'apt-get update' is idempotent.
     apt-get update -q
 
     # Kernel Headers and dkms are required to build the vbox guest kernel
     # modules.
-    apt-get install -q -y linux-headers-generic-lts-raring dkms
+    apt-get install -q -y linux-image-extra-`uname -r` dkms
 
     echo 'Downloading VBox Guest Additions...'
-    wget -cq http://dlc.sun.com.edgesuite.net/virtualbox/4.3.2/VBoxGuestAdditions_4.3.2.iso
+    wget -cq http://dlc.sun.com.edgesuite.net/virtualbox/4.3.6/VBoxGuestAdditions_4.3.6.iso
+    echo "95648fcdb5d028e64145a2fe2f2f28c946d219da366389295a61fed296ca79f0  VBoxGuestAdditions_4.3.6.iso" | sha256sum --check || exit 1
 
-    mount -o loop,ro /home/vagrant/VBoxGuestAdditions_4.3.2.iso /mnt
+    mount -o loop,ro /home/vagrant/VBoxGuestAdditions_4.3.6.iso /mnt
     /mnt/VBoxLinuxAdditions.run --nox11
     umount /mnt
 fi
@@ -141,7 +142,6 @@ Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
 
   config.vm.provider :virtualbox do |vb, override|
     override.vm.provision :shell, :inline => $vbox_script
-    vb.memory = 1024
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
   end
@@ -155,20 +155,6 @@ end
 
 if !FORWARD_DOCKER_PORTS.nil?
   Vagrant::VERSION < "1.1.0" and Vagrant::Config.run do |config|
-    (49000..49900).each do |port|
-      config.vm.forward_port port, port
-    end
-  end
-
-  Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
-    (49000..49900).each do |port|
-      config.vm.network :forwarded_port, :host => port, :guest => port
-    end
-  end
-end
-
-if !PRIVATE_NETWORK.nil?
-  Vagrant::VERSION < "1.1.0" and Vagrant::Config.run do |config|
     config.vm.network :hostonly, PRIVATE_NETWORK
   end
 
@@ -176,4 +162,3 @@ if !PRIVATE_NETWORK.nil?
     config.vm.network "private_network", ip: PRIVATE_NETWORK
   end
 end
-
