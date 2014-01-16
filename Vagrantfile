@@ -1,8 +1,8 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-BOX_NAME = ENV['BOX_NAME'] || "13.10"
-BOX_URI = ENV['BOX_URI'] || "http://cloud-images.ubuntu.com/vagrant/saucy/current/saucy-server-cloudimg-amd64-vagrant-disk1.box"
+BOX_NAME = ENV['BOX_NAME'] || "ubuntu-13.10-server-amd64"
+BOX_URI = ENV['BOX_URI'] || "https://dl.dropboxusercontent.com/u/364276/github.com/pandrew/docker-ubuntu-current/ubuntu-13.10-server-amd64.box"
 VF_BOX_URI = ENV['BOX_URI'] || "http://files.vagrantup.com/precise64_vmware_fusion.box"
 AWS_BOX_URI = ENV['BOX_URI'] || "https://github.com/mitchellh/vagrant-aws/raw/master/dummy.box"
 AWS_REGION = ENV['AWS_REGION'] || "us-east-1"
@@ -16,30 +16,6 @@ SSH_PRIVKEY_PATH = ENV["SSH_PRIVKEY_PATH"]
 # A script to upgrade from the 12.04 kernel to the raring backport kernel (3.8)
 # and install docker.
 $script = <<SCRIPT
-# The username to add to the docker group will be passed as the first argument
-# to the script.  If nothing is passed, default to "vagrant".
-user="$1"
-if [ -z "$user" ]; then
-    user=vagrant
-fi
-
-# Adding an apt gpg key is idempotent.
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9
-
-# Creating the docker.list file is idempotent, but it may overwrite desired
-# settings if it already exists.  This could be solved with md5sum but it
-# doesn't seem worth it.
-echo 'deb http://get.docker.io/ubuntu docker main' > \
-    /etc/apt/sources.list.d/docker.list
-
-# Update remote package metadata.  'apt-get update' is idempotent.
-apt-get update -q
-
-# Install docker.  'apt-get install' is idempotent.
-apt-get install -q -y lxc-docker
-
-usermod -a -G docker "$user"
-
 
 locale-gen sv_SE.UTF-8
 if [[ ! /etc/default/locale ]]; then
@@ -50,7 +26,6 @@ LANGUAGE="en_UTF.UTF-8"
 EOF
 fi
 
-#apt-get install -y linux-image-extra-`uname -r`
 curl -fL https://raw.github.com/mesosphere/mesos-docker/master/bin/mesos-docker-setup | sudo bash
 
 
@@ -156,6 +131,20 @@ end
 
 if !FORWARD_DOCKER_PORTS.nil?
   Vagrant::VERSION < "1.1.0" and Vagrant::Config.run do |config|
+    (49000..49900).each do |port|
+      config.vm.forward_port port, port
+    end
+  end
+
+  Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
+    (49000..49900).each do |port|
+      config.vm.network :forwarded_port, :host => port, :guest => port
+    end
+  end
+end
+
+if !PRIVATE_NETWORK.nil?
+  Vagrant::VERSION < "1.1.0" and Vagrant::Config.run do |config|
     config.vm.network :hostonly, PRIVATE_NETWORK
   end
 
@@ -163,3 +152,4 @@ if !FORWARD_DOCKER_PORTS.nil?
     config.vm.network "private_network", ip: PRIVATE_NETWORK
   end
 end
+
