@@ -27,8 +27,11 @@ EOF
 fi
 
 curl -fL https://raw.github.com/mesosphere/mesos-docker/master/bin/mesos-docker-setup | sudo bash
-
-
+apt-get install -y maven openjdk-6-jdk scala  git
+apt-get install -y python-software-properties software-properties-common python g++ make
+add-apt-repository ppa:chris-lea/node.js
+apt-get -y update
+apt-get -y install nodejs
 SCRIPT
 
 # We need to install the virtualbox guest additions *before* we do the normal
